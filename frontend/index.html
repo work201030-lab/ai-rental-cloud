@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#635bff">
+<title>AI Rental Cloud</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Tahoma,sans-serif;background:#f4f6fb;color:#172033}
+.app{min-height:100vh;display:flex}
+.side{width:230px;background:#111827;color:#fff;padding:18px;position:fixed;inset:0 auto 0 0}
+.content{margin-left:230px;width:calc(100% - 230px)}
+header{height:60px;background:#fff;border-bottom:1px solid #ddd;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:3}
+.logo{font-weight:800;font-size:20px;margin-bottom:22px}
+.logo small{display:block;color:#9ca3af;font-size:11px;margin-top:4px}
+.nav button{display:block;width:100%;border:0;background:transparent;color:#ccd3df;padding:12px;text-align:left;border-radius:9px;margin:3px 0;cursor:pointer}
+.nav button:hover{background:#ffffff18;color:#fff}
+main{max-width:1200px;margin:auto;padding:20px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.card{background:#fff;border:1px solid #e4e7ed;border-radius:14px;padding:16px;box-shadow:0 6px 20px #00000008}
+.stat b{display:block;font-size:25px;margin-top:7px}
+h1{font-size:23px;margin:0 0 6px}
+h2{font-size:18px}
+.muted{color:#6b7280;font-size:13px}
+label{display:block;font-size:12px;font-weight:700;margin:9px 0 5px}
+input,textarea,select{width:100%;padding:10px;border:1px solid #d8dde6;border-radius:9px;font:inherit;background:#fff}
+textarea{min-height:105px;resize:vertical}
+.btn{border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer}
+.primary{background:#635bff;color:#fff}
+.secondary{background:#eef0ff;color:#4338ca}
+.danger{background:#fee2e2;color:#991b1b}
+.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.hidden{display:none!important}
+.result{background:#111827;color:#e5e7eb;padding:14px;border-radius:10px;white-space:pre-wrap;min-height:160px;line-height:1.7}
+.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:11px;border-radius:9px;line-height:1.6}
+.prop{display:flex;justify-content:space-between;gap:8px;padding:10px;border:1px solid #e5e7eb;border-radius:9px;margin-bottom:7px}
+.bottom{display:none}
+.authwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f6fb}
+.authcard{background:#fff;border-radius:16px;padding:28px;width:340px;box-shadow:0 10px 30px #0000000f}
+.planbadge{display:inline-block;padding:4px 10px;border-radius:999px;background:#eef0ff;color:#4338ca;font-size:12px;font-weight:700}
+@media(max-width:850px){
+.side{display:none}
+.content{margin:0;width:100%;padding-bottom:60px}
+.grid{grid-template-columns:repeat(2,1fr)}
+.two{grid-template-columns:1fr}
+.bottom{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #ddd;z-index:5;justify-content:space-around}
+.bottom button{border:0;background:none;padding:9px}
+}
+@media(max-width:500px){
+.grid{grid-template-columns:1fr}
+main{padding:12px}
+}
+[dir=rtl] .side{inset:0 0 0 auto}
+.rtl .content{margin-left:0;margin-right:230px}
+@media(max-width:850px){.rtl .content{margin-right:0}}
+</style>
+</head>
+
+<body>
+
+<div class="authwrap" id="authScreen">
+  <div class="authcard">
+    <div class="logo" style="color:#111827">
+      ☁️ AI Rental Cloud
+      <small>Airbnb • Booking • Vrbo</small>
+    </div>
+
+    <label data-ar="البريد الإلكتروني" data-en="Email"></label>
+    <input id="authEmail" type="email" placeholder="you@example.com">
+
+    <label data-ar="كلمة المرور" data-en="Password"></label>
+    <input id="authPass" type="password" placeholder="••••••••">
+
+    <div class="actions">
+      <button class="btn primary" onclick="signIn()" data-ar="تسجيل الدخول" data-en="Sign in"></button>
+      <button class="btn secondary" onclick="signUp()" data-ar="حساب جديد" data-en="Create account"></button>
+    </div>
+
+    <p id="authMsg" class="muted"></p>
+  </div>
+</div>
+
+<div class="app hidden" id="appRoot">
+
+<aside class="side">
+  <div class="logo">
+    ☁️ AI Rental Cloud
+    <small>Airbnb • Booking • Vrbo</small>
+  </div>
+
+  <div class="nav">
+    <button onclick="go('dash')" data-ar="📊 لوحة التحكم" data-en="📊 Dashboard"></button>
+    <button onclick="go('props')" data-ar="🏠 العقارات" data-en="🏠 Properties"></button>
+    <button onclick="go('ai')" data-ar="🤖 استوديو AI" data-en="🤖 AI Studio"></button>
+    <button onclick="go('money')" data-ar="💰 الإيرادات" data-en="💰 Revenue"></button>
+    <button onclick="go('settings')" data-ar="⚙️ الحساب والدفع" data-en="⚙️ Account & Billing"></button>
+  </div>
+
+  <button class="btn secondary" style="margin-top:20px;width:100%" onclick="signOut()" data-ar="تسجيل الخروج" data-en="Sign out"></button>
+</aside>
+
+<div class="content">
+
+<header>
+  <b>☁️ AI Rental Cloud</b>
+  <span>
+    <span class="planbadge" id="planBadge">trial</span>
+    <button class="btn secondary" onclick="toggleLang()">
+      🌐 <span id="lang">English</span>
+    </button>
+  </span>
+</header>
+
+<main>
+
+<section id="dash">
+<h1 data-ar="لوحة التحكم" data-en="Dashboard"></h1>
+<p class="muted" data-ar="إدارة الإيجارات القصيرة بالذكاء الاصطناعي" data-en="AI short-term rental management"></p>
+
+<div class="grid">
+
+<div class="card stat">
+🏠 <span data-ar="العقارات" data-en="Properties"></span>
+<b id="cnt">0</b>
+</div>
+
+<div class="card stat">
+💵 <span data-ar="الإيراد الشهري" data-en="Monthly revenue"></span>
+<b id="rv">$0</b>
+</div>
+
+<div class="card stat">
+📈 <span data-ar="الإشغال" data-en="Occupancy"></span>
+<b id="oc">0%</b>
+</div>
+
+<div class="card stat">
+🤖 <span data-ar="استخدام AI هذا الشهر" data-en="AI usage this month"></span>
+<b id="usageStat">0</b>
+</div>
+
+</div>
+
+<div class="two">
+
+<div class="card">
+<h2 data-ar="🏠 العقارات" data-en="🏠 Properties"></h2>
+<div id="plist"></div>
+<button class="btn primary" onclick="go('props')" data-ar="+ إضافة عقار" data-en="+ Add property"></button>
+</div>
+
+<div class="card">
+<h2 data-ar="🌐 Multi-AI Cloud" data-en="🌐 Multi-AI Cloud"></h2>
+<p class="muted"
+data-ar="مساعد عربي وإنجليزي مع Gemini عبر خادم آمن."
+data-en="Arabic and English assistant powered by Gemini through a secure server.">
+</p>
+
+<div class="notice"
+data-ar="مفاتيح الذكاء الاصطناعي لا توضع في المتصفح."
+data-en="AI provider keys are never stored in the browser.">
+</div>
+
+</div>
+
+</div>
+</section>
+
+<section id="props" class="hidden">
+<h1 data-ar="🏠 العقارات" data-en="🏠 Properties"></h1>
+
+<div class="card">
+
+<label data-ar="اسم العقار" data-en="Property name"></label>
+<input id="name">
+
+<label data-ar="الموقع" data-en="Location"></label>
+<input id="loc">
+
+<div class="two">
+
+<div>
+<label data-ar="السعر الليلي ($)" data-en="Nightly price ($)"></label>
+<input id="price" type="number" value="80">
+</div>
+
+<div>
+<label data-ar="الليالي المحجوزة / الشهر" data-en="Booked nights / month"></label>
+<input id="nights" type="number" value="20">
+</div>
+
+</div>
+
+<label data-ar="المميزات" data-en="Features"></label>
+<textarea id="features"></textarea>
+
+<label data-ar="رابط الإعلان" data-en="Listing URL"></label>
+<input id="url">
+
+<div class="actions">
+<button class="btn primary" onclick="add()" data-ar="حفظ" data-en="Save"></button>
+<button class="btn secondary" onclick="clearF()" data-ar="مسح" data-en="Clear"></button>
+</div>
+
+</div>
+</section>
+
+<section id="ai" class="hidden">
+
+<h1 data-ar="🤖 استوديو AI" data-en="🤖 AI Studio"></h1>
+
+<p class="muted"
+data-ar="مساعد للإيجارات بالعربية والإنجليزية."
+data-en="Arabic + English rental assistant.">
+</p>
+
+<div class="two">
+
+<div class="card">
+
+<label data-ar="المزوّد" data-en="Provider"></label>
+
+<select id="provider">
+<option value="auto">Auto / Gemini</option>
+<option value="gemini">Google Gemini</option>
+</select>
+
+<label data-ar="الموديل (اختياري)" data-en="Model (optional)"></label>
+<input id="model" placeholder="auto">
+
+<label data-ar="العقار" data-en="Property"></label>
+<select id="aprop"></select>
+
+<label data-ar="المهمة" data-en="Task"></label>
+
+<select id="task">
+
+<option value="listing" data-ar="تحسين الإعلان" data-en="Improve listing"></option>
+<option value="pricing" data-ar="تحليل التسعير" data-en="Pricing analysis"></option>
+<option value="message" data-ar="الرد على الضيف" data-en="Guest reply"></option>
+<option value="review" data-ar="تحليل التقييمات" data-en="Review analysis"></option>
+<option value="strategy" data-ar="خطة 30 يومًا" data-en="30-day strategy"></option>
+
+</select>
+
+<label data-ar="معلومات إضافية" data-en="Extra information"></label>
+<textarea id="extra"></textarea>
+
+<div class="actions">
+
+<button class="btn primary" onclick="runAI()" data-ar="تشغيل AI" data-en="Run AI"></button>
+
+<button class="btn secondary" onclick="copyOut()" data-ar="نسخ" data-en="Copy"></button>
+
+</div>
+
+<p id="status" class="muted"></p>
+
+</div>
+
+<div class="card">
+<h2 data-ar="النتيجة" data-en="Result"></h2>
+<div id="out" class="result">...</div>
+</div>
+
+</div>
+</section>
+
+<section id="money" class="hidden">
+
+<h1 data-ar="💰 الإيرادات" data-en="💰 Revenue"></h1>
+
+<div class="card">
+
+<div class="two">
+
+<div>
+<label data-ar="عدد العقارات" data-en="Properties"></label>
+<input id="mp" type="number" value="10">
+</div>
+
+<div>
+<label data-ar="متوسط السعر الليلي" data-en="Average nightly price"></label>
+<input id="mprice" type="number" value="80">
+</div>
+
+<div>
+<label data-ar="متوسط الليالي المحجوزة" data-en="Average booked nights"></label>
+<input id="mn" type="number" value="20">
+</div>
+
+<div>
+<label data-ar="نسبة الإدارة %" data-en="Management fee %"></label>
+<input id="mr" type="number" value="15">
+</div>
+
+</div>
+
+<button class="btn primary" onclick="calc()" data-ar="حساب" data-en="Calculate"></button>
+
+<div id="calc" class="result" style="margin-top:10px"></div>
+
+</div>
+</section>
+
+<section id="settings" class="hidden">
+
+<h1 data-ar="⚙️ الحساب والدفع" data-en="⚙️ Account & Billing"></h1>
+
+<div class="card">
+
+<p>
+<span data-ar="البريد:" data-en="Email:"></span>
+<b id="accEmail"></b>
+</p>
+
+<p>
+<span data-ar="الباقة الحالية:" data-en="Current plan:"></span>
+<span class="planbadge" id="planBadge2">trial</span>
+</p>
+
+<p class="muted" id="usageDetail"></p>
+
+<div class="actions">
+
+<button class="btn primary"
+onclick="subscribe('starter')"
+data-ar="الاشتراك في Starter"
+data-en="Subscribe to Starter">
+</button>
+
+<button class="btn primary"
+onclick="subscribe('pro')"
+data-ar="الاشتراك في Pro"
+data-en="Subscribe to Pro">
+</button>
+
+</div>
+
+<p id="billingMsg" class="muted"></p>
+
+</div>
+</section>
+
+</main>
+</div>
+</div>
+
+<div class="bottom hidden" id="bottomNav">
+<button onclick="go('dash')">📊</button>
+<button onclick="go('props')">🏠</button>
+<button onclick="go('ai')">🤖</button>
+<button onclick="go('money')">💰</button>
+<button onclick="go('settings')">⚙️</button>
+</div>
+
+<script>
+
+const SUPABASE_URL="https://wgcbufwcnwlbnrqonzbj.supabase.co";
+
+const SUPABASE_ANON_KEY="sb_publishable_hsfmfFbSVsAAfAbSlwHJ0A_XCe1-dCb";
+
+const PADDLE_CLIENT_TOKEN="YOUR-PADDLE-CLIENT-SIDE-TOKEN";
+
+const PADDLE_ENV="sandbox";
+
+const PADDLE_PRICE_IDS={
+starter:"pri_XXXXXXXXXXXX",
+pro:"pri_YYYYYYYYYYYY"
+};
+
+const supabase=window.supabase.createClient(
+SUPABASE_URL,
+SUPABASE_ANON_KEY
+);
+
+if(
+PADDLE_CLIENT_TOKEN &&
+!PADDLE_CLIENT_TOKEN.startsWith("YOUR-")
+){
+Paddle.Environment.set(PADDLE_ENV);
+Paddle.Initialize({
+token:PADDLE_CLIENT_TOKEN
+});
+}
+
+let lang=localStorage.getItem("arc_lang")||"ar";
+let data=[];
+let currentUser=null;
+let profile=null;
+
+const $=x=>document.getElementById(x);
+const v=x=>$(x).value.trim();
+const money=x=>"$"+Number(x||0).toLocaleString();
+
+function apply(){
+
+document.documentElement.lang=lang;
+
+document.documentElement.dir=
+lang==="ar"?"rtl":"ltr";
+
+document.querySelector(".app")
+.classList.toggle("rtl",lang==="ar");
+
+document.querySelectorAll("[data-ar]")
+.forEach(e=>{
+e.textContent=
+lang==="ar"
+?e.dataset.ar
+:e.dataset.en;
+});
+
+document.querySelectorAll("option[data-ar]")
+.forEach(e=>{
+e.textContent=
+lang==="ar"
+?e.dataset.ar
+:e.dataset.en;
+});
+
+$("lang").textContent=
+lang==="ar"
+?"English"
+:"العربية";
+
+}
+
+function toggleLang(){
+
+lang=lang==="ar"?"en":"ar";
+
+localStorage.setItem("arc_lang",lang);
+
+apply();
+
+}
+
+function go(id){
+
+["dash","props","ai","money","settings"]
+.forEach(x=>{
+$(x).classList.toggle("hidden",x!==id);
+});
+
+apply();
+render();
+
+if(id==="ai")populate();
+
+}
+
+// ================= AUTH =================
+
+async function signUp(){
+
+const email=v("authEmail");
+const password=v("authPass");
+
+if(!email||!password){
+
+$("authMsg").textContent=
+lang==="ar"
+?"أدخل البريد وكلمة المرور."
+:"Enter email and password.";
+
+return;
+}
+
+const {error}=await supabase.auth.signUp({
+email,
+password
+});
+
+$("authMsg").textContent=
+error
+?error.message
+:lang==="ar"
+?"تم إنشاء الحساب. تحقق من بريدك ثم سجّل الدخول."
+:"Account created. Check your email, then sign in.";
+
+}
+
+async function signIn(){
+
+const email=v("authEmail");
+const password=v("authPass");
+
+const {error}=
+await supabase.auth.signInWithPassword({
+email,
+password
+});
+
+if(error){
+
+$("authMsg").textContent=error.message;
+
+return;
+
+}
+
+await boot();
+
+}
+
+async function signOut(){
+
+await supabase.auth.signOut();
+
+location.reload();
+
+}
+
+// ================= BOOT =================
+
+async function boot(){
+
+const {
+data:{user}
+}=await supabase.auth.getUser();
+
+if(!user)return;
+
+currentUser=user;
+
+$("authScreen").classList.add("hidden");
+
+$("appRoot").classList.remove("hidden");
+
+$("bottomNav").classList.remove("hidden");
+
+$("accEmail").textContent=user.email;
+
+await loadProfile();
+
+await loadProperties();
+
+apply();
+
+render();
+
+calc();
+
+go("dash");
+
+}
+
+async function loadProfile(){
+
+const {data:p,error}=await supabase
+.from("profiles")
+.select("*")
+.eq("id",currentUser.id)
+.single();
+
+if(error){
+
+console.warn("Profile load:",error.message);
+
+return;
+
+}
+
+profile=p;
+
+if(profile){
+
+$("planBadge").textContent=profile.plan||"trial";
+
+$("planBadge2").textContent=
+(profile.plan||"trial")+" ("+
+(profile.subscription_status||"trial")+
+")";
+
+$("usageStat").textContent=
+profile.ai_usage_count||0;
+
+$("usageDetail").textContent=
+lang==="ar"
+?"استخدام AI: "+(profile.ai_usage_count||0)+" طلب هذا الشهر"
+:"AI usage: "+(profile.ai_usage_count||0)+" requests this month";
+
+}
+
+}
+
+// ================= PROPERTIES =================
+
+async function loadProperties(){
+
+const {
+data:rows,
+error
+}=await supabase
+.from("properties")
+.select("*")
+.eq("user_id",currentUser.id)
+.order("created_at",{ascending:false});
+
+if(error){
+
+console.warn("Properties load:",error.message);
+
+data=[];
+
+return;
+
+}
+
+data=(rows||[]).map(r=>({
+
+id:r.id,
+name:r.name||"",
+loc:r.loc||"",
+price:Number(r.price)||0,
+nights:Number(r.nights)||0,
+features:r.features||"",
+url:r.url||""
+
+}));
+
+}
+
+function render(){
+
+let r=data.reduce(
+(a,p)=>a+p.price*p.nights,
+0
+);
+
+let n=data.reduce(
+(a,p)=>a+p.nights,
+0
+);
+
+$("cnt").textContent=data.length;
+
+$("rv").textContent=money(r);
+
+$("oc").textContent=
+(
+data.length
+?Math.min(
+100,
+Math.round(
+n/(data.length*30)*100
+)
+)
+:0
+)+"%";
+
+$("plist").innerHTML=
+data.map(p=>`
+
+<div class="prop">
+
+<span>
+
+<b>${escapeHtml(p.name)}</b>
+
+<br>
+
+<small>
+${escapeHtml(p.loc)}
+•
+${money(p.price)}
+•
+${p.nights}
+</small>
+
+</span>
+
+<button
+class="btn danger"
+onclick="removeP('${p.id}')">
+×
+</button>
+
+</div>
+
+`).join("")
+||
+(
+lang==="ar"
+?"<small>لا توجد عقارات</small>"
+:"<small>No properties</small>"
+);
+
+}
+
+function escapeHtml(value){
+
+return String(value||"")
+.replace(/&/g,"&amp;")
+.replace(/</g,"&lt;")
+.replace(/>/g,"&gt;")
+.replace(/"/g,"&quot;")
+.replace(/'/g,"&#039;");
+
+}
+
+async function add(){
+
+const row={
+
+user_id:currentUser.id,
+
+name:v("name"),
+
+loc:v("loc"),
+
+price:+v("price")||0,
+
+nights:+v("nights")||0,
+
+features:v("features"),
+
+url:v("url")
+
+};
+
+if(!row.name){
+
+alert(
+lang==="ar"
+?"اكتب اسم العقار"
+:"Enter property name"
+);
+
+return;
+
+}
+
+const {error}=
+await supabase
+.from("properties")
+.insert(row);
+
+if(error){
+
+alert(error.message);
+
+return;
+
+}
+
+clearF();
+
+await loadProperties();
+
+go("dash");
+
+}
+
+async function removeP(id){
+
+if(!confirm(
+lang==="ar"
+?"هل تريد حذف العقار؟"
+:"Delete this property?"
+))return;
+
+const {error}=
+await supabase
+.from("properties")
+.delete()
+.eq("id",id);
+
+if(error){
+
+alert(error.message);
+
+return;
+
+}
+
+await loadProperties();
+
+render();
+
+populate();
+
+}
+
+function clearF(){
+
+["name","loc","features","url"]
+.forEach(x=>$(x).value="");
+
+$("price").value=80;
+
+$("nights").value=20;
+
+}
+
+function populate(){
+
+$("aprop").innerHTML=
+data.map(p=>
+`<option value="${p.id}">
+${escapeHtml(p.name)}
+</option>`
+).join("");
+
+}
+
+// ================= AI =================
+
+function promptText(){
+
+let p=
+data.find(
+x=>x.id===$("aprop").value
+)||{};
+
+let t=$("task").value;
+
+let j={
+
+listing:
+"Improve the rental listing title and description in Arabic and English.",
+
+pricing:
+"Analyze the provided pricing and suggest a practical range. Do not claim live market data.",
+
+message:
+"Write a polite guest reply in Arabic and English. Never invent facts.",
+
+review:
+"Analyze reviews and give strengths, problems and improvements.",
+
+strategy:
+"Create a practical 30-day plan to increase bookings and revenue."
+
+};
+
+return `
+
+You are an expert short-term rental manager.
+
+${j[t]}
+
+Property:
+${p.name}
+
+Location:
+${p.loc}
+
+Price:
+$${p.price}/night
+
+Nights/month:
+${p.nights}
+
+Features:
+${p.features}
+
+URL:
+${p.url}
+
+Extra:
+${v("extra")}
+
+Use only supplied facts.
+
+Be concise.
+
+User language:
+${lang}
+
+`;
+
+}
+
+async function runAI(){
+
+if(!data.length){
+
+alert(
+lang==="ar"
+?"أضف عقارًا أولًا"
+:"Add a property first"
+);
+
+return;
+
+}
+
+$("out").textContent="";
+
+$("status").textContent=
+lang==="ar"
+?"جارٍ التنفيذ..."
+:"Running...";
+
+try{
+
+const {
+data:sess
+}=await supabase.auth.getSession();
+
+if(!sess?.session?.access_token){
+
+throw new Error(
+lang==="ar"
+?"انتهت جلسة الدخول."
+:"Your session has expired."
+);
+
+}
+
+const res=
+await fetch(
+SUPABASE_URL+
+"/functions/v1/ai-proxy",
+{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json",
+"Authorization":
+"Bearer "+
+sess.session.access_token
+},
+
+body:JSON.stringify({
+
+prompt:promptText(),
+
+provider:"gemini",
+
+model:v("model")
+
+})
+
+});
+
+let d={};
+
+try{
+d=await res.json();
+}catch(e){}
+
+if(!res.ok){
+
+$("out").textContent=
+d.error||
+(
+lang==="ar"
+?"حدث خطأ في خدمة
